@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>TradeWise AI</title>
+
+<meta http-equiv="refresh" content="30">
+
+<style>
+
+body{
+background:#081421;
+font-family:Arial;
+color:white;
+text-align:center;
+}
+
+table{
+margin:auto;
+width:85%;
+border-collapse:collapse;
+}
+
+th{
+background:#1b3550;
+padding:12px;
+}
+
+td{
+padding:10px;
+border-bottom:1px solid #333;
+}
+
+.buy{
+color:#00ff88;
+font-weight:bold;
+}
+
+.sell{
+color:#ff4d4d;
+font-weight:bold;
+}
+
+.wait{
+color:#ffc107;
+}
+
+.marketopen{
+color:#00ff88;
+}
+
+.marketclosed{
+color:#ff4d4d;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>TradeWise AI — Swing Scanner</h1>
+
+<h3 class="{{ 'marketopen' if market_status=='OPEN' else 'marketclosed' }}">
+Market Status: {{market_status}}
+</h3>
+
+<p>{{message}}</p>
+
+<h2>Buy Opportunities</h2>
+
+{% if buy_stocks|length == 0 %}
+
+<p>No strong swing trade signals currently.</p>
+
+{% else %}
+
+<table>
+
+<tr>
+<th>Stock</th>
+<th>Price</th>
+<th>RSI</th>
+<th>MA44</th>
+<th>Volume</th>
+<th>Signal</th>
+</tr>
+
+{% for stock in buy_stocks %}
+
+<tr>
+<td>{{stock.stock}}</td>
+<td>{{stock.price}}</td>
+<td>{{stock.rsi}}</td>
+<td>{{stock.ma44}}</td>
+<td>{{stock.volume_ratio}}</td>
+<td class="buy">{{stock.signal}}</td>
+</tr>
+
+{% endfor %}
+
+</table>
+
+{% endif %}
+
+
+<h2>Market Overview</h2>
+
+<table>
+
+<tr>
+<th>Stock</th>
+<th>Price</th>
+<th>RSI</th>
+<th>MA44</th>
+<th>Volume</th>
+<th>Signal</th>
+</tr>
+
+{% for stock in stocks %}
+
+<tr>
+
+<td>{{stock.stock}}</td>
+<td>{{stock.price}}</td>
+<td>{{stock.rsi}}</td>
+<td>{{stock.ma44}}</td>
+<td>{{stock.volume_ratio}}</td>
+
+<td class="{{stock.signal|lower}}">
+{{stock.signal}}
+</td>
+
+</tr>
+
+{% endfor %}
+
+</table>
+
+</body>
+</html>
