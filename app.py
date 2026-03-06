@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template_string
 import yfinance as yf
 import pandas as pd
 import ta
@@ -7,20 +7,33 @@ import pytz
 
 app = Flask(__name__)
 
-# Beginner friendly stocks (cheap + liquid)
-STOCK_LIST = [
-    "ITC.NS",
-    "IRFC.NS",
-    "RVNL.NS",
-    "NHPC.NS",
-    "NBCC.NS",
-    "SAIL.NS",
-    "BANKBARODA.NS",
-    "PNB.NS",
-    "IDEA.NS",
-    "SUZLON.NS"
+# Beginner friendly + popular NSE stocks
+stocks = [
+"SBIN.NS","IRFC.NS","NHPC.NS","SUZLON.NS","TATAMOTORS.NS",
+"YESBANK.NS","IDEA.NS","BHEL.NS","PFC.NS","HUDCO.NS",
+"IOC.NS","ONGC.NS","BANKBARODA.NS","PNB.NS","IDFCFIRSTB.NS",
+"ITC.NS","HDFCBANK.NS","INFY.NS","WIPRO.NS","TCS.NS"
 ]
 
+# ---------------------------------------
+
+def get_market_status():
+
+    india = pytz.timezone("Asia/Kolkata")
+    now = datetime.now(india)
+
+    if now.weekday() >= 5:
+        return "Market Closed (Weekend)"
+
+    if now.hour < 9 or (now.hour == 9 and now.minute < 15):
+        return "Market Closed (Before Open)"
+
+    if now.hour > 15 or (now.hour == 15 and now.minute > 30):
+        return "Market Closed (After Market)"
+
+    return "Market Open"
+
+# ---------------------------------------
 
 def scan_stock(stock):
 
@@ -31,9 +44,12 @@ def scan_stock(stock):
         if df.empty:
             return None
 
-        df["RSI"] = ta.momentum.RSIIndicator(df["Close"].squeeze()).rsi()
+        df["Close"] = pd.to_numeric(df["Close"])
+        df["Volume"] = pd.to_numeric(df["Volume"])
 
-        df["MA44"] = df["Close"].rolling(44).mean()
+        df["MA44"] = df["Close"].ewm(span=44).mean()
+
+        df["RSI"] = ta.momentum.RSIIndicator(df["Close"]).rsi()
 
         df["AvgVolume"] = df["Volume"].rolling(20).mean()
 
@@ -44,70 +60,160 @@ def scan_stock(stock):
         price = float(latest["Close"])
         rsi = float(latest["RSI"])
         ma44 = float(latest["MA44"])
-        vol_ratio = float(latest["VolumeRatio"])
+        volume_ratio = float(latest["VolumeRatio"])
 
         signal = "WAIT"
 
-        if rsi > 55 and price > ma44 and vol_ratio > 1.5:
+        if price > ma44 and rsi > 55 and volume_ratio > 1.2:
             signal = "BUY"
 
-        if rsi < 45 and price < ma44:
-            signal = "SELL"
-
         return {
-            "stock": stock.replace(".NS", ""),
-            "price": round(price, 2),
-            "rsi": round(rsi, 2),
-            "ma44": round(ma44, 2),
-            "volume_ratio": round(vol_ratio, 2),
+            "stock": stock.replace(".NS",""),
+            "price": round(price,2),
+            "rsi": round(rsi,2),
+            "ma44": round(ma44,2),
+            "volume": round(volume_ratio,2),
             "signal": signal
         }
 
     except:
         return None
 
-
-def check_market_status():
-
-    india = pytz.timezone("Asia/Kolkata")
-    now = datetime.now(india)
-
-    hour = now.hour
-    minute = now.minute
-    weekday = now.weekday()
-
-    market_open = False
-
-    if weekday < 5:
-        if (hour > 9 or (hour == 9 and minute >= 15)) and (hour < 15 or (hour == 15 and minute <= 30)):
-            market_open = True
-
-    if market_open:
-        return "🟢 Market Open"
-    else:
-        return "🔴 Market Closed (showing last data)"
-
+# ---------------------------------------
 
 @app.route("/")
+
 def home():
 
-    stocks_data = []
+    results = []
 
-    for stock in STOCK_LIST:
+    for stock in stocks:
 
         data = scan_stock(stock)
 
         if data:
-            stocks_data.append(data)
+            results.append(data)
 
-    market_status = check_market_status()
+    market = get_market_status()
 
-    return render_template(
-        "index.html",
-        stocks=stocks_data,
-        market_status=market_status
-    )
+    html = """
 
+    <html>
+
+    <head>
+
+    <title>TradeWise AI</title>
+
+    <style>
+
+    body{
+    font-family: Arial;
+    background:#0f172a;
+    color:white;
+    padding:40px;
+    }
+
+    h1{
+    color:#38bdf8;
+    }
+
+    table{
+    border-collapse:collapse;
+    width:100%;
+    margin-top:20px;
+    }
+
+    th,td{
+    padding:12px;
+    text-align:center;
+    border-bottom:1px solid #334155;
+    }
+
+    th{
+    background:#1e293b;
+    }
+
+    .buy{
+    background:#16a34a;
+    padding:6px 14px;
+    border-radius:6px;
+    }
+
+    .wait{
+    background:#ef4444;
+    padding:6px 14px;
+    border-radius:6px;
+    }
+
+    </style>
+
+    </head>
+
+    <body>
+
+    <h1>📈 TradeWise AI Scanner</h1>
+
+    <h3>Market Status : {{market}}</h3>
+
+    <table>
+
+    <tr>
+
+    <th>Stock</th>
+    <th>Price</th>
+    <th>RSI</th>
+    <th>44 EMA</th>
+    <th>Volume Boost</th>
+    <th>Signal</th>
+
+    </tr>
+
+    {% for r in results %}
+
+    <tr>
+
+    <td>{{r.stock}}</td>
+    <td>{{r.price}}</td>
+    <td>{{r.rsi}}</td>
+    <td>{{r.ma44}}</td>
+    <td>{{r.volume}}</td>
+
+    <td>
+
+    {% if r.signal=="BUY" %}
+
+    <span class="buy">BUY</span>
+
+    {% else %}
+
+    <span class="wait">WAIT</span>
+
+    {% endif %}
+
+    </td>
+
+    </tr>
+
+    {% endfor %}
+
+    </table>
+
+    {% if results|length == 0 %}
+
+    <p>No market data available right now.</p>
+
+    {% endif %}
+
+    </body>
+
+    </html>
+
+    """
+
+    return render_template_string(html,results=results,market=market)
+
+# ---------------------------------------
 
 if __name__ == "__main__":
+
     app.run(debug=True)
