@@ -1,29 +1,37 @@
 <!DOCTYPE html>
 <html>
+
 <head>
 
 <title>TradeWise AI</title>
 
-<meta http-equiv="refresh" content="30">
+<meta http-equiv="refresh" content="60">
 
 <style>
 
 body{
-background:#081421;
-font-family:Arial;
+background:#061c2e;
 color:white;
+font-family:Arial;
 text-align:center;
 }
 
+button{
+padding:8px 14px;
+margin:5px;
+cursor:pointer;
+}
+
 table{
+width:90%;
 margin:auto;
-width:85%;
 border-collapse:collapse;
+margin-top:20px;
 }
 
 th{
-background:#1b3550;
-padding:12px;
+background:#24415e;
+padding:10px;
 }
 
 td{
@@ -31,104 +39,91 @@ padding:10px;
 border-bottom:1px solid #333;
 }
 
+.tab{
+background:#24415e;
+color:white;
+border:none;
+}
+
 .buy{
-color:#00ff88;
-font-weight:bold;
-}
-
-.sell{
-color:#ff4d4d;
-font-weight:bold;
-}
-
-.wait{
-color:#ffc107;
-}
-
-.marketopen{
-color:#00ff88;
-}
-
-.marketclosed{
-color:#ff4d4d;
+background:#00c853;
+border:none;
+color:white;
 }
 
 </style>
 
-</head>
+<script>
 
+function showTab(tab){
+
+document.getElementById("intraday").style.display="none"
+document.getElementById("swing").style.display="none"
+
+document.getElementById(tab).style.display="block"
+
+}
+
+</script>
+
+</head>
+<link rel="manifest" href="/static/manifest.json">
+
+<script>
+if ('serviceWorker' in navigator) {
+navigator.serviceWorker.register('/static/sw.js')
+}
+</script>
 <body>
 
-<h1>TradeWise AI — Swing Scanner</h1>
+<h1>TradeWise AI</h1>
 
-<h3 class="{{ 'marketopen' if market_status=='OPEN' else 'marketclosed' }}">
-Market Status: {{market_status}}
-</h3>
+<p>Last Scan: {{time}}</p>
 
-<p>{{message}}</p>
+<button class="tab" onclick="showTab('intraday')">Intraday</button>
+<button class="tab" onclick="showTab('swing')">Swing</button>
 
-<h2>Buy Opportunities</h2>
 
-{% if buy_stocks|length == 0 %}
+<!-- INTRADAY TAB -->
 
-<p>No strong swing trade signals currently.</p>
+<div id="intraday">
 
-{% else %}
+<h2>Intraday Opportunities</h2>
 
 <table>
 
 <tr>
 <th>Stock</th>
-<th>Price</th>
-<th>RSI</th>
-<th>MA44</th>
-<th>Volume</th>
-<th>Signal</th>
+<th>Entry</th>
+<th>Stoploss</th>
+<th>Target</th>
+<th>Qty</th>
+<th>Action</th>
 </tr>
 
-{% for stock in buy_stocks %}
-
-<tr>
-<td>{{stock.stock}}</td>
-<td>{{stock.price}}</td>
-<td>{{stock.rsi}}</td>
-<td>{{stock.ma44}}</td>
-<td>{{stock.volume_ratio}}</td>
-<td class="buy">{{stock.signal}}</td>
-</tr>
-
-{% endfor %}
-
-</table>
-
-{% endif %}
-
-
-<h2>Market Overview</h2>
-
-<table>
-
-<tr>
-<th>Stock</th>
-<th>Price</th>
-<th>RSI</th>
-<th>MA44</th>
-<th>Volume</th>
-<th>Signal</th>
-</tr>
-
-{% for stock in stocks %}
+{% for t in intraday_trades %}
 
 <tr>
 
-<td>{{stock.stock}}</td>
-<td>{{stock.price}}</td>
-<td>{{stock.rsi}}</td>
-<td>{{stock.ma44}}</td>
-<td>{{stock.volume_ratio}}</td>
+<td>{{t.stock}}</td>
+<td>{{t.entry}}</td>
+<td>{{t.stoploss}}</td>
+<td>{{t.target}}</td>
+<td>{{t.qty}}</td>
 
-<td class="{{stock.signal|lower}}">
-{{stock.signal}}
+<td>
+
+<form action="/buy_intraday" method="post">
+
+<input type="hidden" name="stock" value="{{t.stock}}">
+<input type="hidden" name="entry" value="{{t.entry}}">
+<input type="hidden" name="stoploss" value="{{t.stoploss}}">
+<input type="hidden" name="target" value="{{t.target}}">
+
+<button class="buy">BUY</button>
+
+</form>
+
 </td>
 
 </tr>
@@ -137,5 +132,115 @@ Market Status: {{market_status}}
 
 </table>
 
+<h2>Active Intraday Trades</h2>
+
+<table>
+
+<tr>
+<th>Stock</th>
+<th>Entry</th>
+<th>Current</th>
+<th>Target</th>
+<th>Status</th>
+</tr>
+
+{% for t in active_intraday_trades %}
+
+<tr>
+
+<td>{{t.stock}}</td>
+<td>{{t.entry}}</td>
+<td>{{t.current}}</td>
+<td>{{t.target}}</td>
+<td>{{t.status}}</td>
+
+</tr>
+
+{% endfor %}
+
+</table>
+
+</div>
+
+
+<!-- SWING TAB -->
+
+<div id="swing" style="display:none">
+
+<h2>Swing Opportunities</h2>
+
+<table>
+
+<tr>
+<th>Stock</th>
+<th>Entry</th>
+<th>Stoploss</th>
+<th>Target</th>
+<th>Qty</th>
+<th>Action</th>
+</tr>
+
+{% for t in swing_trades %}
+
+<tr>
+
+<td>{{t.stock}}</td>
+<td>{{t.entry}}</td>
+<td>{{t.stoploss}}</td>
+<td>{{t.target}}</td>
+<td>{{t.qty}}</td>
+
+<td>
+
+<form action="/buy_swing" method="post">
+
+<input type="hidden" name="stock" value="{{t.stock}}">
+<input type="hidden" name="entry" value="{{t.entry}}">
+<input type="hidden" name="stoploss" value="{{t.stoploss}}">
+<input type="hidden" name="target" value="{{t.target}}">
+
+<button class="buy">BUY</button>
+
+</form>
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</table>
+
+<h2>Active Swing Trades</h2>
+
+<table>
+
+<tr>
+<th>Stock</th>
+<th>Entry</th>
+<th>Current</th>
+<th>Target</th>
+<th>Status</th>
+</tr>
+
+{% for t in active_swing_trades %}
+
+<tr>
+
+<td>{{t.stock}}</td>
+<td>{{t.entry}}</td>
+<td>{{t.current}}</td>
+<td>{{t.target}}</td>
+<td>{{t.status}}</td>
+
+</tr>
+
+{% endfor %}
+
+</table>
+
+</div>
+
 </body>
+
 </html>

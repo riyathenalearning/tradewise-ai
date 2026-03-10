@@ -1,219 +1,151 @@
-from flask import Flask, render_template_string
+from flask import Flask, render_template, request, redirect
 import yfinance as yf
 import pandas as pd
-import ta
-from datetime import datetime
-import pytz
+import datetime
 
 app = Flask(__name__)
 
-# Beginner friendly + popular NSE stocks
+capital = 5000
+
 stocks = [
-"SBIN.NS","IRFC.NS","NHPC.NS","SUZLON.NS","TATAMOTORS.NS",
-"YESBANK.NS","IDEA.NS","BHEL.NS","PFC.NS","HUDCO.NS",
-"IOC.NS","ONGC.NS","BANKBARODA.NS","PNB.NS","IDFCFIRSTB.NS",
-"ITC.NS","HDFCBANK.NS","INFY.NS","WIPRO.NS","TCS.NS"
+"IRFC.NS","RVNL.NS","SUZLON.NS","IDEA.NS","NHPC.NS",
+"IOC.NS","PFC.NS","RECLTD.NS","SAIL.NS","BHEL.NS",
+"YESBANK.NS","IDFCFIRSTB.NS","BANKINDIA.NS",
+"CANBK.NS","UCOBANK.NS","HUDCO.NS","IREDA.NS",
+"TATAMOTORS.NS","COALINDIA.NS","ONGC.NS"
 ]
 
-# ---------------------------------------
+active_intraday_trades = []
+active_swing_trades = []
 
-def get_market_status():
 
-    india = pytz.timezone("Asia/Kolkata")
-    now = datetime.now(india)
+def calculate_rsi(series, period=14):
 
-    if now.weekday() >= 5:
-        return "Market Closed (Weekend)"
+    delta = series.diff()
 
-    if now.hour < 9 or (now.hour == 9 and now.minute < 15):
-        return "Market Closed (Before Open)"
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
 
-    if now.hour > 15 or (now.hour == 15 and now.minute > 30):
-        return "Market Closed (After Market)"
+    avg_gain = gain.rolling(period).mean()
+    avg_loss = loss.rolling(period).mean()
 
-    return "Market Open"
+    rs = avg_gain / avg_loss
 
-# ---------------------------------------
+    rsi = 100 - (100/(1+rs))
 
-def scan_stock(stock):
+    return rsi
 
-    try:
 
-        df = yf.download(stock, period="3mo", interval="1d")
+def calculate_vwap(df):
 
-        if df.empty:
-            return None
+    pv = (df["Close"] * df["Volume"]).cumsum()
+    vol = df["Volume"].cumsum()
 
-        df["Close"] = pd.to_numeric(df["Close"])
-        df["Volume"] = pd.to_numeric(df["Volume"])
+    return pv / vol
 
-        df["MA44"] = df["Close"].ewm(span=44).mean()
 
-        df["RSI"] = ta.momentum.RSIIndicator(df["Close"]).rsi()
+def scan_intraday():
 
-        df["AvgVolume"] = df["Volume"].rolling(20).mean()
-
-        df["VolumeRatio"] = df["Volume"] / df["AvgVolume"]
-
-        latest = df.iloc[-1]
-
-        price = float(latest["Close"])
-        rsi = float(latest["RSI"])
-        ma44 = float(latest["MA44"])
-        volume_ratio = float(latest["VolumeRatio"])
-
-        signal = "WAIT"
-
-        if price > ma44 and rsi > 55 and volume_ratio > 1.2:
-            signal = "BUY"
-
-        return {
-            "stock": stock.replace(".NS",""),
-            "price": round(price,2),
-            "rsi": round(rsi,2),
-            "ma44": round(ma44,2),
-            "volume": round(volume_ratio,2),
-            "signal": signal
-        }
-
-    except:
-        return None
-
-# ---------------------------------------
-
-@app.route("/")
-
-def home():
-
-    results = []
+    trades = []
 
     for stock in stocks:
 
-        data = scan_stock(stock)
+        try:
 
-        if data:
-            results.append(data)
+            df = yf.download(stock, period="2d", interval="5m", progress=False)
 
-    market = get_market_status()
+            if df.empty:
+                continue
 
-    html = """
+            df["RSI"] = calculate_rsi(df["Close"])
+            df["VWAP"] = calculate_vwap(df)
 
-    <html>
+            price = df["Close"].iloc[-1]
+            rsi = df["RSI"].iloc[-1]
+            vwap = df["VWAP"].iloc[-1]
 
-    <head>
+            avg_volume = df["Volume"].tail(10).mean()
+            current_volume = df["Volume"].iloc[-1]
 
-    <title>TradeWise AI</title>
+            if price < 500 and price > vwap and rsi > 55 and current_volume > avg_volume:
 
-    <style>
+                entry = round(price,2)
+                stoploss = round(price*0.985,2)
+                target = round(price*1.03,2)
 
-    body{
-    font-family: Arial;
-    background:#0f172a;
-    color:white;
-    padding:40px;
-    }
+                qty = int(capital/price)
 
-    h1{
-    color:#38bdf8;
-    }
+                trades.append({
+                    "stock":stock,
+                    "entry":entry,
+                    "stoploss":stoploss,
+                    "target":target,
+                    "qty":qty
+                })
 
-    table{
-    border-collapse:collapse;
-    width:100%;
-    margin-top:20px;
-    }
+        except:
+            continue
 
-    th,td{
-    padding:12px;
-    text-align:center;
-    border-bottom:1px solid #334155;
-    }
+    return trades
 
-    th{
-    background:#1e293b;
-    }
 
-    .buy{
-    background:#16a34a;
-    padding:6px 14px;
-    border-radius:6px;
-    }
+def scan_swing():
 
-    .wait{
-    background:#ef4444;
-    padding:6px 14px;
-    border-radius:6px;
-    }
+    trades = []
 
-    </style>
+    for stock in stocks:
 
-    </head>
+        try:
 
-    <body>
+            df = yf.download(stock, period="3mo", interval="1d", progress=False)
 
-    <h1>📈 TradeWise AI Scanner</h1>
+            if df.empty:
+                continue
 
-    <h3>Market Status : {{market}}</h3>
+            df["RSI"] = calculate_rsi(df["Close"])
 
-    <table>
+            price = df["Close"].iloc[-1]
+            rsi = df["RSI"].iloc[-1]
 
-    <tr>
+            ma50 = df["Close"].rolling(50).mean().iloc[-1]
 
-    <th>Stock</th>
-    <th>Price</th>
-    <th>RSI</th>
-    <th>44 EMA</th>
-    <th>Volume Boost</th>
-    <th>Signal</th>
+            if price > ma50 and rsi < 60 and price < 500:
 
-    </tr>
+                entry = round(price,2)
+                stoploss = round(price*0.95,2)
+                target = round(price*1.12,2)
 
-    {% for r in results %}
+                qty = int(capital/price)
 
-    <tr>
+                trades.append({
+                    "stock":stock,
+                    "entry":entry,
+                    "stoploss":stoploss,
+                    "target":target,
+                    "qty":qty
+                })
 
-    <td>{{r.stock}}</td>
-    <td>{{r.price}}</td>
-    <td>{{r.rsi}}</td>
-    <td>{{r.ma44}}</td>
-    <td>{{r.volume}}</td>
+        except:
+            continue
 
-    <td>
+    return trades
 
-    {% if r.signal=="BUY" %}
 
-    <span class="buy">BUY</span>
+@app.route("/")
+def home():
 
-    {% else %}
+    intraday = scan_intraday()
+    swing = scan_swing()
 
-    <span class="wait">WAIT</span>
+    time = datetime.datetime.now().strftime("%H:%M:%S")
 
-    {% endif %}
+    return render_template(
+        "index.html",
+        intraday_trades=intraday,
+        swing_trades=swing,
+        time=time
+    )
 
-    </td>
-
-    </tr>
-
-    {% endfor %}
-
-    </table>
-
-    {% if results|length == 0 %}
-
-    <p>No market data available right now.</p>
-
-    {% endif %}
-
-    </body>
-
-    </html>
-
-    """
-
-    return render_template_string(html,results=results,market=market)
-
-# ---------------------------------------
 
 if __name__ == "__main__":
-
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
