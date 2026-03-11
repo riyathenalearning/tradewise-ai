@@ -7,4 +7,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping app
-        run: curl https://tradewise-ai-gnsc.onrender.com
+        run: curl https://tradewise-ai-gnsc.onrender.com 
