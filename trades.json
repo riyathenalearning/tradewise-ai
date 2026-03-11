@@ -1,0 +1,14 @@
+{
+  "intraday": [],
+  "swing": [
+    {
+      "stock": "COALINDIA",
+      "full_ticker": "COALINDIA.NS",
+      "entry": 446.75,
+      "stoploss": 424.41,
+      "target": 500.36,
+      "qty": 11,
+      "bought_at": "2026-03-11 15:58:59"
+    }
+  ]
+}
