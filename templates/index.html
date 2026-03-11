@@ -1,141 +1,719 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>TradeWise AI</title>
 
-<meta http-equiv="refresh" content="30">
+<!-- PWA manifest -->
+<link rel="manifest" href="/manifest.json">
+
+<!-- iOS PWA: makes it launch full-screen like a real app -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TradeWise">
+
+<!-- iOS home screen icon (use your own 512x512 PNG ideally) -->
+<link rel="apple-touch-icon" href="/static/icon-512.png">
+<link rel="apple-touch-icon" sizes="192x192" href="/static/icon-192.png">
+
+<!-- Android / browser theme colour -->
+<meta name="theme-color" content="#040d14">
+<meta name="mobile-web-app-capable" content="yes">
+
+<!-- Prevents iOS from auto-detecting phone numbers as links -->
+<meta name="format-detection" content="telephone=no">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
 
 <style>
-
-body{
-background:#081421;
-font-family:Arial;
-color:white;
-text-align:center;
+:root {
+  --bg:      #040d14;
+  --surface: #071826;
+  --panel:   #0b2236;
+  --border:  #0f3352;
+  --accent:  #00d4ff;
+  --green:   #00e676;
+  --red:     #ff5252;
+  --amber:   #ffab40;
+  --text:    #cce8f4;
+  --muted:   #4a7a9b;
+  --mono:    'Space Mono', monospace;
+  --sans:    'Syne', sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:var(--sans); min-height:100vh; overflow-x:hidden; }
+/* iPhone notch / Dynamic Island safe area */
+header { padding-top: max(16px, env(safe-area-inset-top)); }
+main   { padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+body::before {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image: linear-gradient(rgba(0,212,255,.03) 1px,transparent 1px),
+                    linear-gradient(90deg,rgba(0,212,255,.03) 1px,transparent 1px);
+  background-size: 40px 40px;
 }
 
-table{
-margin:auto;
-width:85%;
-border-collapse:collapse;
+/* ── Header ── */
+header {
+  position:relative; z-index:10;
+  padding:16px 28px;
+  display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;
+  border-bottom:1px solid var(--border);
+  background:rgba(4,13,20,.92); backdrop-filter:blur(12px);
 }
+.logo { font-size:20px; font-weight:800; letter-spacing:-.5px; color:#fff; }
+.logo span { color:var(--accent); }
+.header-right { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.header-meta { font-family:var(--mono); font-size:11px; color:var(--muted); }
+.market-badge { padding:4px 12px; border-radius:20px; font-size:11px; font-weight:700; border:1px solid; }
+.market-open   { color:var(--green);  border-color:var(--green);  background:rgba(0,230,118,.08); }
+.market-closed { color:var(--red);    border-color:var(--red);    background:rgba(255,82,82,.08); }
+.market-pre    { color:var(--amber);  border-color:var(--amber);  background:rgba(255,171,64,.08); }
 
-th{
-background:#1b3550;
-padding:12px;
+.notif-btn {
+  padding:6px 14px; border-radius:20px; font-size:11px; font-weight:700;
+  border:1px solid var(--accent); background:rgba(0,212,255,.08);
+  color:var(--accent); cursor:pointer; font-family:var(--sans); transition:.2s;
 }
+.notif-btn:hover { background:rgba(0,212,255,.18); }
+.notif-btn.enabled { border-color:var(--green); color:var(--green); background:rgba(0,230,118,.08); }
 
-td{
-padding:10px;
-border-bottom:1px solid #333;
+/* ── Main ── */
+main { position:relative; z-index:1; max-width:1280px; margin:0 auto; padding:24px 20px; }
+
+/* ── Stats bar ── */
+.stats-bar { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:24px; }
+.stat-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
+.stat-label { font-size:9px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:5px; }
+.stat-value { font-family:var(--mono); font-size:18px; color:#fff; font-weight:700; }
+.stat-value.accent { color:var(--accent); }
+.stat-value.green  { color:var(--green); }
+.stat-value.red    { color:var(--red); }
+.stat-value.amber  { color:var(--amber); }
+
+/* ── Tabs ── */
+.tab-nav { display:flex; gap:4px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:4px; margin-bottom:22px; width:fit-content; flex-wrap:wrap; }
+.tab-btn { padding:8px 22px; border:none; border-radius:7px; cursor:pointer; font-family:var(--sans); font-size:12px; font-weight:600; letter-spacing:.3px; transition:.2s; background:transparent; color:var(--muted); }
+.tab-btn.active { background:var(--accent); color:#000; }
+.tab-btn:not(.active):hover { color:var(--text); background:var(--panel); }
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+
+/* ── Section headers ── */
+.section-header { display:flex; align-items:center; gap:10px; margin:24px 0 12px; }
+.section-title { font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--accent); white-space:nowrap; }
+.section-line { flex:1; height:1px; background:var(--border); }
+.badge-count { background:var(--accent); color:#000; font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; }
+
+/* ── Tables ── */
+.table-wrap { overflow-x:auto; border-radius:12px; border:1px solid var(--border); }
+table { width:100%; border-collapse:collapse; }
+thead th { background:var(--panel); padding:10px 14px; font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); text-align:left; white-space:nowrap; }
+tbody tr { border-top:1px solid var(--border); transition:background .15s; }
+tbody tr:hover { background:rgba(0,212,255,.04); }
+td { padding:11px 14px; font-size:13px; white-space:nowrap; }
+
+.stock-name { font-family:var(--mono); font-weight:700; color:#fff; font-size:13px; }
+.price-val  { font-family:var(--mono); font-size:13px; }
+.trig-val   { font-family:var(--mono); color:var(--amber); font-size:13px; font-weight:700; }
+.sl-val     { font-family:var(--mono); color:var(--red); }
+.tgt-val    { font-family:var(--mono); color:var(--green); }
+.rsi-val    { font-family:var(--mono); color:var(--amber); font-size:12px; }
+.signal-chip { display:inline-block; padding:3px 8px; border-radius:4px; font-size:9px; font-weight:600; letter-spacing:.3px; background:rgba(0,212,255,.12); color:var(--accent); border:1px solid rgba(0,212,255,.25); }
+
+/* ── Buttons ── */
+.btn-buy { padding:6px 16px; background:var(--green); color:#000; border:none; border-radius:6px; cursor:pointer; font-family:var(--sans); font-size:11px; font-weight:700; transition:.15s; }
+.btn-buy:hover { filter:brightness(1.15); transform:translateY(-1px); }
+.btn-close { padding:5px 12px; background:transparent; color:var(--red); border:1px solid var(--red); border-radius:6px; cursor:pointer; font-size:11px; font-weight:600; transition:.15s; }
+.btn-close:hover { background:rgba(255,82,82,.12); }
+.btn-danger { padding:6px 16px; background:transparent; color:var(--red); border:1px solid var(--red); border-radius:6px; cursor:pointer; font-family:var(--sans); font-size:11px; font-weight:600; transition:.15s; }
+.btn-danger:hover { background:rgba(255,82,82,.1); }
+
+/* Status chips */
+.status-chip { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
+.status-target { background:rgba(0,230,118,.15); color:var(--green); }
+.status-sl     { background:rgba(255,82,82,.15);  color:var(--red); }
+.status-up     { background:rgba(0,212,255,.12);  color:var(--accent); }
+.status-down   { background:rgba(255,82,82,.1);   color:#ff8a80; }
+
+.pnl-pos { color:var(--green); font-family:var(--mono); font-size:13px; }
+.pnl-neg { color:var(--red);   font-family:var(--mono); font-size:13px; }
+
+/* Outcome chips */
+.outcome-profit   { background:rgba(0,230,118,.15); color:var(--green); padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
+.outcome-loss     { background:rgba(255,82,82,.15);  color:var(--red);   padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
+.outcome-breakeven { background:rgba(255,171,64,.15); color:var(--amber); padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
+
+/* Exit price input */
+.exit-input {
+  width:80px; padding:5px 8px; background:var(--panel); border:1px solid var(--border);
+  border-radius:5px; color:#fff; font-family:var(--mono); font-size:12px; outline:none;
 }
+.exit-input:focus { border-color:var(--accent); }
 
-.buy{
-color:#00ff88;
-font-weight:bold;
+/* ── Empty state ── */
+.empty-state { text-align:center; padding:40px 20px; color:var(--muted); }
+.empty-icon { font-size:28px; margin-bottom:8px; }
+.empty-text { font-size:13px; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.scanning { animation:pulse 1.5s infinite; color:var(--amber); }
+
+/* ── Profit Calculator ── */
+.calc-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; margin-top:8px; }
+.calc-title { font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--accent); margin-bottom:18px; }
+.calc-grid { display:grid; grid-template-columns:repeat(3,1fr) auto; gap:12px; align-items:end; }
+.calc-field label { display:block; font-size:9px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:5px; }
+.calc-field input { width:100%; padding:9px 12px; background:var(--panel); border:1px solid var(--border); border-radius:7px; color:#fff; font-family:var(--mono); font-size:13px; outline:none; transition:border-color .2s; }
+.calc-field input:focus { border-color:var(--accent); }
+.btn-calc { padding:9px 20px; background:var(--accent); color:#000; border:none; border-radius:7px; cursor:pointer; font-family:var(--sans); font-size:12px; font-weight:700; transition:.15s; white-space:nowrap; }
+.btn-calc:hover { filter:brightness(1.1); }
+.calc-result { margin-top:14px; display:none; grid-template-columns:repeat(4,1fr); gap:12px; }
+.calc-result.visible { display:grid; }
+.result-item { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:12px 14px; }
+.result-label { font-size:9px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:4px; }
+.result-val { font-family:var(--mono); font-size:15px; color:#fff; font-weight:700; }
+.result-val.pos { color:var(--green); }
+.result-val.neg { color:var(--red); }
+
+/* ── PWA install banner ── */
+.install-banner {
+  display:none; position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+  background:var(--panel); border:1px solid var(--accent); border-radius:12px;
+  padding:14px 20px; z-index:100; box-shadow:0 8px 32px rgba(0,212,255,.15);
+  max-width:360px; width:90%; text-align:center;
 }
+.install-banner.visible { display:block; }
+.install-banner h3 { font-size:14px; color:#fff; margin-bottom:6px; }
+.install-banner p  { font-size:11px; color:var(--muted); margin-bottom:12px; }
+.install-actions { display:flex; gap:8px; justify-content:center; }
+.btn-install { padding:8px 20px; background:var(--accent); color:#000; border:none; border-radius:7px; cursor:pointer; font-weight:700; font-size:12px; }
+.btn-dismiss { padding:8px 16px; background:transparent; color:var(--muted); border:1px solid var(--border); border-radius:7px; cursor:pointer; font-size:12px; }
 
-.sell{
-color:#ff4d4d;
-font-weight:bold;
+/* ── History summary cards ── */
+.history-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+.h-stat { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:12px 14px; text-align:center; }
+.h-stat-label { font-size:9px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:4px; }
+.h-stat-value { font-family:var(--mono); font-size:16px; font-weight:700; }
+
+@media(max-width:900px) {
+  .stats-bar { grid-template-columns:repeat(3,1fr); }
+  .calc-grid { grid-template-columns:1fr 1fr; }
+  header { flex-direction:column; align-items:flex-start; }
 }
-
-.wait{
-color:#ffc107;
+@media(max-width:600px) {
+  .stats-bar { grid-template-columns:repeat(2,1fr); }
+  .history-stats { grid-template-columns:repeat(2,1fr); }
 }
-
-.marketopen{
-color:#00ff88;
-}
-
-.marketclosed{
-color:#ff4d4d;
-}
-
 </style>
-
 </head>
-
 <body>
 
-<h1>TradeWise AI — Swing Scanner</h1>
+<!-- ── Header ── -->
+<header>
+  <div class="logo">Trade<span>Wise</span> <span style="font-size:11px;opacity:.4;font-weight:400">AI</span></div>
+  <div class="header-right">
+    <div class="header-meta">Last scan: <span style="color:var(--text)">{{ last_scan }}</span></div>
+    <div class="header-meta">Capital: <span style="color:var(--accent)">₹{{ capital }}</span></div>
+    {% if "Open" in market_status %}
+      <span class="market-badge market-open">{{ market_status }}</span>
+    {% elif "Pre" in market_status %}
+      <span class="market-badge market-pre">{{ market_status }}</span>
+    {% else %}
+      <span class="market-badge market-closed">{{ market_status }}</span>
+    {% endif %}
+    <button class="notif-btn" id="notifBtn" onclick="requestNotifications()">🔔 Enable Alerts</button>
+  </div>
+</header>
 
-<h3 class="{{ 'marketopen' if market_status=='OPEN' else 'marketclosed' }}">
-Market Status: {{market_status}}
-</h3>
+<!-- ── Main ── -->
+<main>
 
-<p>{{message}}</p>
+  <!-- Stats Bar -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">Intraday Signals</div>
+      <div class="stat-value accent">{{ intraday_trades|length }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Swing Signals</div>
+      <div class="stat-value accent">{{ swing_trades|length }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Active Intraday</div>
+      <div class="stat-value green">{{ active_intraday_trades|length }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Active Swing</div>
+      <div class="stat-value green">{{ active_swing_trades|length }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total P&L</div>
+      <div class="stat-value {{ 'green' if total_pnl >= 0 else 'red' }}">
+        {{ '+' if total_pnl >= 0 else '' }}₹{{ total_pnl }}
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Win Rate</div>
+      <div class="stat-value {{ 'green' if win_rate >= 50 else 'amber' }}">{{ win_rate }}%</div>
+    </div>
+  </div>
 
-<h2>Buy Opportunities</h2>
+  <!-- Tab Nav -->
+  <div class="tab-nav">
+    <button class="tab-btn active" onclick="showTab('intraday',this)">⚡ Intraday</button>
+    <button class="tab-btn"        onclick="showTab('swing',this)">📈 Swing</button>
+    <button class="tab-btn"        onclick="showTab('history',this)">📒 Journal</button>
+    <button class="tab-btn"        onclick="showTab('calculator',this)">🧮 Calculator</button>
+  </div>
 
-{% if buy_stocks|length == 0 %}
+  <!-- ══ INTRADAY ══ -->
+  <div id="intraday" class="tab-content active">
 
-<p>No strong swing trade signals currently.</p>
+    <div class="section-header">
+      <span class="section-title">Opportunities</span>
+      <span class="badge-count">{{ intraday_trades|length }}</span>
+      <div class="section-line"></div>
+    </div>
 
-{% else %}
+    {% if intraday_trades %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Stock</th><th>Trigger ₹</th><th>Entry ₹</th><th>Stop Loss ₹</th>
+          <th>Target ₹</th><th>Pts Gain</th><th>Qty</th><th>RSI</th><th>Signal</th><th>Action</th>
+        </tr></thead>
+        <tbody>
+        {% for t in intraday_trades %}
+        <tr>
+          <td><span class="stock-name">{{ t.stock }}</span></td>
+          <td><span class="trig-val">{{ t.trigger }}</span></td>
+          <td><span class="price-val">{{ t.entry }}</span></td>
+          <td><span class="sl-val">{{ t.stoploss }}</span></td>
+          <td><span class="tgt-val">{{ t.target }}</span></td>
+          <td><span class="tgt-val">+{{ t.point_gain }}</span></td>
+          <td><span class="price-val">{{ t.qty }}</span></td>
+          <td><span class="rsi-val">{{ t.rsi }}</span></td>
+          <td><span class="signal-chip">{{ t.signal }}</span></td>
+          <td>
+            <form action="/buy_intraday" method="post" style="display:inline">
+              <input type="hidden" name="stock"    value="{{ t.stock }}">
+              <input type="hidden" name="trigger"  value="{{ t.trigger }}">
+              <input type="hidden" name="entry"    value="{{ t.entry }}">
+              <input type="hidden" name="stoploss" value="{{ t.stoploss }}">
+              <input type="hidden" name="target"   value="{{ t.target }}">
+              <input type="hidden" name="qty"      value="{{ t.qty }}">
+              <button class="btn-buy">BUY</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="table-wrap"><div class="empty-state">
+      <div class="empty-icon">🔍</div>
+      <div class="empty-text">
+        {% if "Open" in market_status %}<span class="scanning">Scanning {{ stocks_count }} stocks for intraday setups…</span>
+        {% else %}No signals — market is <strong>{{ market_status }}</strong>{% endif %}
+      </div>
+    </div></div>
+    {% endif %}
 
-<table>
+    <div class="section-header" style="margin-top:32px">
+      <span class="section-title">Active Trades</span>
+      <span class="badge-count">{{ active_intraday_trades|length }}</span>
+      <div class="section-line"></div>
+    </div>
 
-<tr>
-<th>Stock</th>
-<th>Price</th>
-<th>RSI</th>
-<th>MA44</th>
-<th>Volume</th>
-<th>Signal</th>
-</tr>
+    {% if active_intraday_trades %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Stock</th><th>Entry ₹</th><th>Current ₹</th><th>Target ₹</th>
+          <th>P&L ₹</th><th>Status</th><th>Bought At</th><th>Exit Price</th><th>Close</th>
+        </tr></thead>
+        <tbody>
+        {% for t in active_intraday_trades %}
+        <tr>
+          <td><span class="stock-name">{{ t.stock }}</span></td>
+          <td><span class="price-val">{{ t.entry }}</span></td>
+          <td><span class="price-val">{{ t.current }}</span></td>
+          <td><span class="tgt-val">{{ t.target }}</span></td>
+          <td>{% if t.pnl != "—" %}<span class="{{ 'pnl-pos' if t.pnl >= 0 else 'pnl-neg' }}">{{ '+' if t.pnl >= 0 else '' }}₹{{ t.pnl }}</span>{% else %}—{% endif %}</td>
+          <td>{% set s=t.status %}{% if "Target" in s %}<span class="status-chip status-target">{{ s }}</span>{% elif "SL" in s %}<span class="status-chip status-sl">{{ s }}</span>{% elif "▲" in s %}<span class="status-chip status-up">{{ s }}</span>{% else %}<span class="status-chip status-down">{{ s }}</span>{% endif %}</td>
+          <td style="font-size:11px;color:var(--muted)">{{ t.bought_at }}</td>
+          <td>
+            <form action="/close_trade" method="post" style="display:flex;gap:6px;align-items:center">
+              <input type="hidden" name="type"  value="intraday">
+              <input type="hidden" name="index" value="{{ loop.index0 }}">
+              <input class="exit-input" type="number" name="exit_price" placeholder="₹ exit" step="0.01">
+              <button class="btn-close">SELL</button>
+            </form>
+          </td>
+          <td></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="table-wrap"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">No active intraday trades.</div></div></div>
+    {% endif %}
 
-{% for stock in buy_stocks %}
+  </div><!-- /intraday -->
 
-<tr>
-<td>{{stock.stock}}</td>
-<td>{{stock.price}}</td>
-<td>{{stock.rsi}}</td>
-<td>{{stock.ma44}}</td>
-<td>{{stock.volume_ratio}}</td>
-<td class="buy">{{stock.signal}}</td>
-</tr>
+  <!-- ══ SWING ══ -->
+  <div id="swing" class="tab-content">
 
-{% endfor %}
+    <div class="section-header">
+      <span class="section-title">Opportunities</span>
+      <span class="badge-count">{{ swing_trades|length }}</span>
+      <div class="section-line"></div>
+    </div>
 
-</table>
+    {% if swing_trades %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Stock</th><th>Trigger ₹</th><th>Entry ₹</th><th>Stop Loss ₹</th>
+          <th>Target ₹</th><th>Pts Gain</th><th>Qty</th><th>RSI</th><th>Signal</th><th>Action</th>
+        </tr></thead>
+        <tbody>
+        {% for t in swing_trades %}
+        <tr>
+          <td><span class="stock-name">{{ t.stock }}</span></td>
+          <td><span class="trig-val">{{ t.trigger }}</span></td>
+          <td><span class="price-val">{{ t.entry }}</span></td>
+          <td><span class="sl-val">{{ t.stoploss }}</span></td>
+          <td><span class="tgt-val">{{ t.target }}</span></td>
+          <td><span class="tgt-val">+{{ t.point_gain }}</span></td>
+          <td><span class="price-val">{{ t.qty }}</span></td>
+          <td><span class="rsi-val">{{ t.rsi }}</span></td>
+          <td><span class="signal-chip">{{ t.signal }}</span></td>
+          <td>
+            <form action="/buy_swing" method="post" style="display:inline">
+              <input type="hidden" name="stock"    value="{{ t.stock }}">
+              <input type="hidden" name="trigger"  value="{{ t.trigger }}">
+              <input type="hidden" name="entry"    value="{{ t.entry }}">
+              <input type="hidden" name="stoploss" value="{{ t.stoploss }}">
+              <input type="hidden" name="target"   value="{{ t.target }}">
+              <input type="hidden" name="qty"      value="{{ t.qty }}">
+              <button class="btn-buy">BUY</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="table-wrap"><div class="empty-state">
+      <div class="empty-icon">🔍</div>
+      <div class="empty-text">
+        {% if "Open" in market_status %}<span class="scanning">Scanning for swing setups…</span>
+        {% else %}No signals — market is <strong>{{ market_status }}</strong>{% endif %}
+      </div>
+    </div></div>
+    {% endif %}
 
-{% endif %}
+    <div class="section-header" style="margin-top:32px">
+      <span class="section-title">Active Swing Trades</span>
+      <span class="badge-count">{{ active_swing_trades|length }}</span>
+      <div class="section-line"></div>
+    </div>
 
+    {% if active_swing_trades %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Stock</th><th>Entry ₹</th><th>Current ₹</th><th>Target ₹</th>
+          <th>P&L ₹</th><th>Status</th><th>Bought At</th><th>Exit Price</th><th>Close</th>
+        </tr></thead>
+        <tbody>
+        {% for t in active_swing_trades %}
+        <tr>
+          <td><span class="stock-name">{{ t.stock }}</span></td>
+          <td><span class="price-val">{{ t.entry }}</span></td>
+          <td><span class="price-val">{{ t.current }}</span></td>
+          <td><span class="tgt-val">{{ t.target }}</span></td>
+          <td>{% if t.pnl != "—" %}<span class="{{ 'pnl-pos' if t.pnl >= 0 else 'pnl-neg' }}">{{ '+' if t.pnl >= 0 else '' }}₹{{ t.pnl }}</span>{% else %}—{% endif %}</td>
+          <td>{% set s=t.status %}{% if "Target" in s %}<span class="status-chip status-target">{{ s }}</span>{% elif "SL" in s %}<span class="status-chip status-sl">{{ s }}</span>{% elif "▲" in s %}<span class="status-chip status-up">{{ s }}</span>{% else %}<span class="status-chip status-down">{{ s }}</span>{% endif %}</td>
+          <td style="font-size:11px;color:var(--muted)">{{ t.bought_at }}</td>
+          <td>
+            <form action="/close_trade" method="post" style="display:flex;gap:6px;align-items:center">
+              <input type="hidden" name="type"  value="swing">
+              <input type="hidden" name="index" value="{{ loop.index0 }}">
+              <input class="exit-input" type="number" name="exit_price" placeholder="₹ exit" step="0.01">
+              <button class="btn-close">SELL</button>
+            </form>
+          </td>
+          <td></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="table-wrap"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">No active swing trades.</div></div></div>
+    {% endif %}
 
-<h2>Market Overview</h2>
+  </div><!-- /swing -->
 
-<table>
+  <!-- ══ JOURNAL ══ -->
+  <div id="history" class="tab-content">
 
-<tr>
-<th>Stock</th>
-<th>Price</th>
-<th>RSI</th>
-<th>MA44</th>
-<th>Volume</th>
-<th>Signal</th>
-</tr>
+    <div class="section-header">
+      <span class="section-title">Trade Journal</span>
+      <span class="badge-count">{{ total_trades }}</span>
+      <div class="section-line"></div>
+      {% if history %}
+      <form action="/clear_history" method="post" style="margin-left:8px">
+        <button class="btn-danger" onclick="return confirm('Clear all history?')">🗑 Clear All</button>
+      </form>
+      {% endif %}
+    </div>
 
-{% for stock in stocks %}
+    {% if history %}
+    <!-- Summary -->
+    <div class="history-stats">
+      <div class="h-stat">
+        <div class="h-stat-label">Total Trades</div>
+        <div class="h-stat-value" style="color:var(--accent)">{{ total_trades }}</div>
+      </div>
+      <div class="h-stat">
+        <div class="h-stat-label">Net P&L</div>
+        <div class="h-stat-value" style="color:{{ 'var(--green)' if total_pnl >= 0 else 'var(--red)' }}">
+          {{ '+' if total_pnl >= 0 else '' }}₹{{ total_pnl }}
+        </div>
+      </div>
+      <div class="h-stat">
+        <div class="h-stat-label">Win Rate</div>
+        <div class="h-stat-value" style="color:{{ 'var(--green)' if win_rate >= 50 else 'var(--amber)' }}">{{ win_rate }}%</div>
+      </div>
+    </div>
 
-<tr>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Stock</th><th>Type</th><th>Entry ₹</th><th>Exit ₹</th>
+          <th>SL ₹</th><th>Target ₹</th><th>Qty</th><th>P&L ₹</th>
+          <th>Outcome</th><th>Entered</th><th>Exited</th>
+        </tr></thead>
+        <tbody>
+        {% for h in history %}
+        <tr>
+          <td><span class="stock-name">{{ h.stock }}</span></td>
+          <td><span class="signal-chip">{{ h.type }}</span></td>
+          <td><span class="price-val">{{ h.entry }}</span></td>
+          <td><span class="price-val">{{ h.exit }}</span></td>
+          <td><span class="sl-val">{{ h.stoploss }}</span></td>
+          <td><span class="tgt-val">{{ h.target }}</span></td>
+          <td><span class="price-val">{{ h.qty }}</span></td>
+          <td><span class="{{ 'pnl-pos' if h.pnl >= 0 else 'pnl-neg' }}">{{ '+' if h.pnl >= 0 else '' }}₹{{ h.pnl }}</span></td>
+          <td>
+            {% if "Profit" in h.outcome %}<span class="outcome-profit">{{ h.outcome }}</span>
+            {% elif "Loss" in h.outcome %}<span class="outcome-loss">{{ h.outcome }}</span>
+            {% else %}<span class="outcome-breakeven">{{ h.outcome }}</span>{% endif %}
+          </td>
+          <td style="font-size:11px;color:var(--muted)">{{ h.bought_at }}</td>
+          <td style="font-size:11px;color:var(--muted)">{{ h.sold_at }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="table-wrap"><div class="empty-state">
+      <div class="empty-icon">📒</div>
+      <div class="empty-text">No trades closed yet. When you click SELL on an active trade, it will appear here with full details.</div>
+    </div></div>
+    {% endif %}
 
-<td>{{stock.stock}}</td>
-<td>{{stock.price}}</td>
-<td>{{stock.rsi}}</td>
-<td>{{stock.ma44}}</td>
-<td>{{stock.volume_ratio}}</td>
+  </div><!-- /history -->
 
-<td class="{{stock.signal|lower}}">
-{{stock.signal}}
-</td>
+  <!-- ══ CALCULATOR ══ -->
+  <div id="calculator" class="tab-content">
+    <div class="section-header" style="margin-top:4px">
+      <span class="section-title">Net Profit Calculator</span>
+      <div class="section-line"></div>
+    </div>
+    <div class="calc-card">
+      <div class="calc-title">Zerodha Charges Estimator</div>
+      <div class="calc-grid">
+        <div class="calc-field"><label>Buy Price ₹</label><input type="number" id="buyPrice" placeholder="e.g. 45.50" step="0.01"></div>
+        <div class="calc-field"><label>Sell Price ₹</label><input type="number" id="sellPrice" placeholder="e.g. 48.00" step="0.01"></div>
+        <div class="calc-field"><label>Quantity</label><input type="number" id="qty" placeholder="e.g. 100"></div>
+        <button class="btn-calc" onclick="calculateNetProfit()">Calculate</button>
+      </div>
+      <div class="calc-result" id="calcResult">
+        <div class="result-item"><div class="result-label">Gross Profit</div><div class="result-val" id="r-gross">—</div></div>
+        <div class="result-item"><div class="result-label">Total Charges</div><div class="result-val" id="r-charges">—</div></div>
+        <div class="result-item"><div class="result-label">Net Profit</div><div class="result-val" id="r-net">—</div></div>
+        <div class="result-item"><div class="result-label">Break-even ₹</div><div class="result-val" id="r-be">—</div></div>
+      </div>
+    </div>
+  </div><!-- /calculator -->
 
-</tr>
+</main>
 
-{% endfor %}
+<!-- ── PWA Install Banner ── -->
+<div class="install-banner" id="installBanner">
+  <h3>📱 Add TradeWise to Home Screen</h3>
+  <p>Get live alerts and access it like a real app — no app store needed!</p>
+  <div class="install-actions">
+    <button class="btn-install" id="installBtn">Install App</button>
+    <button class="btn-dismiss" onclick="document.getElementById('installBanner').classList.remove('visible')">Not now</button>
+  </div>
+</div>
 
-</table>
+<script>
+// ── Tab switching ─────────────────────────────────────────────
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById(name).classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+
+// ── Profit calculator ─────────────────────────────────────────
+function calculateNetProfit() {
+  const buy  = parseFloat(document.getElementById("buyPrice").value);
+  const sell = parseFloat(document.getElementById("sellPrice").value);
+  const qty  = parseInt(document.getElementById("qty").value);
+  if (isNaN(buy) || isNaN(sell) || isNaN(qty) || qty <= 0) return;
+
+  const buyVal  = buy * qty;
+  const sellVal = sell * qty;
+  const gross   = sellVal - buyVal;
+
+  const stt             = (buyVal * 0.001) + (sellVal * 0.001);
+  const stampDuty       = buyVal * 0.00015;
+  const exchangeCharges = (buyVal + sellVal) * 0.0000325;
+  const dpCharge        = 15.93;
+  const gst             = (stt + exchangeCharges) * 0.18;
+  const totalCharges    = stt + stampDuty + exchangeCharges + dpCharge + gst;
+  const net             = gross - totalCharges;
+  const breakEven       = buy + (totalCharges / qty);
+
+  document.getElementById("calcResult").classList.add("visible");
+  document.getElementById("r-gross").textContent   = `₹${gross.toFixed(2)}`;
+  document.getElementById("r-charges").textContent = `₹${totalCharges.toFixed(2)}`;
+  const netEl = document.getElementById("r-net");
+  netEl.textContent = `₹${net.toFixed(2)}`;
+  netEl.className   = "result-val " + (net >= 0 ? "pos" : "neg");
+  document.getElementById("r-be").textContent = `₹${breakEven.toFixed(2)}`;
+}
+
+// ── Push notifications ────────────────────────────────────────
+async function requestNotifications() {
+  if (!("Notification" in window) || !("serviceWorker" in navigator)) {
+    alert("Push notifications are not supported on this browser. To get notifications, install the app on your phone first (tap the Install App banner).");
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  if (perm === "granted") {
+    document.getElementById("notifBtn").textContent = "🔔 Alerts ON";
+    document.getElementById("notifBtn").classList.add("enabled");
+    // Register SW and subscribe
+    const reg = await navigator.serviceWorker.ready;
+    // Show a test notification
+    reg.showNotification("TradeWise AI", {
+      body: "✅ Alerts enabled! You'll be notified when new buy/sell signals appear.",
+      icon: "/static/icon.png",
+      badge: "/static/icon.png",
+      tag: "tradewise-welcome"
+    });
+    scheduleSignalChecks(reg);
+    localStorage.setItem("tw_notif", "1");
+  } else {
+    alert("Please allow notifications in your browser settings to receive trade alerts.");
+  }
+}
+
+// Poll for new signals and fire notification
+function scheduleSignalChecks(reg) {
+  let lastIntraday = {{ intraday_trades|length }};
+  let lastSwing    = {{ swing_trades|length }};
+
+  setInterval(async () => {
+    try {
+      const res  = await fetch("/api/scan");
+      const data = await res.json();
+      const newI = data.intraday.length;
+      const newS = data.swing.length;
+
+      if (newI > lastIntraday) {
+        const added = data.intraday.slice(lastIntraday);
+        added.forEach(t => {
+          reg.showNotification("⚡ Intraday Signal!", {
+            body: `${t.stock} — Entry ₹${t.entry} | Target ₹${t.target} | SL ₹${t.stoploss}`,
+            icon: "/static/icon.png",
+            tag: "intraday-" + t.stock,
+            requireInteraction: true,
+          });
+        });
+        lastIntraday = newI;
+      }
+
+      if (newS > lastSwing) {
+        const added = data.swing.slice(lastSwing);
+        added.forEach(t => {
+          reg.showNotification("📈 Swing Signal!", {
+            body: `${t.stock} — Entry ₹${t.entry} | Target ₹${t.target} | SL ₹${t.stoploss}`,
+            icon: "/static/icon.png",
+            tag: "swing-" + t.stock,
+            requireInteraction: true,
+          });
+        });
+        lastSwing = newS;
+      }
+    } catch(e) {}
+  }, 5 * 60 * 1000);  // check every 5 minutes
+}
+
+// ── PWA install prompt ────────────────────────────────────────
+let deferredPrompt;
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById("installBanner").classList.add("visible");
+});
+
+document.getElementById("installBtn").addEventListener("click", async () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    document.getElementById("installBanner").classList.remove("visible");
+  }
+});
+
+window.addEventListener("appinstalled", () => {
+  document.getElementById("installBanner").classList.remove("visible");
+});
+
+// ── Register service worker ───────────────────────────────────
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").then(reg => {
+    console.log("SW registered");
+    // Re-enable notifications if previously granted
+    if (localStorage.getItem("tw_notif") === "1" && Notification.permission === "granted") {
+      document.getElementById("notifBtn").textContent = "🔔 Alerts ON";
+      document.getElementById("notifBtn").classList.add("enabled");
+      scheduleSignalChecks(reg);
+    }
+  });
+}
+
+// ── Auto-refresh (market hours only) ─────────────────────────
+(function() {
+  if ("{{ market_status }}".includes("Open")) {
+    setTimeout(() => location.reload(), 5 * 60 * 1000);
+  }
+})();
+</script>
 
 </body>
 </html>
